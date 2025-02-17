@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDFNetra - Professional PDF OCR Tool</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .drop-zone {
+            transition: all 0.3s ease;
+        }
+        .drop-zone:hover {
+            transform: scale(1.02);
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        .processing-animation {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-gray-50 to-primary-50">
+    <nav class="bg-white shadow-lg border-b border-primary-100">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 flex items-center">
+                        <div class="w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center mr-3">
+                            <i class="fas fa-eye text-white text-2xl"></i>
+                        </div>
+                        <span class="text-2xl font-bold bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent">
+                            PDFNetra
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto py-12 sm:px-6 lg:px-8">
+        <div class="max-w-4xl mx-auto">
+            <div class="bg-white shadow-xl rounded-2xl overflow-hidden border border-primary-100">
+                <div class="px-8 py-6 bg-gradient-to-r from-primary-600 to-primary-800 text-white">
+                    <h1 class="text-3xl font-bold">PDF OCR Processing</h1>
+                    <p class="mt-2 text-primary-100">Extract text and LaTeX equations from your PDFs with AI-powered precision</p>
+                </div>
+
+                <div class="p-8">
+                    <form id="upload-form" onsubmit="handleSubmit(event)">
+                        <div class="space-y-6">
+                            <!-- File Upload Zone -->
+                            <div class="drop-zone border-2 border-dashed border-primary-300 rounded-xl p-8 bg-primary-50/50 text-center cursor-pointer hover:border-primary-500 transition-colors group">
+                                <input type="file" 
+                                       name="pdf_file" 
+                                       id="pdf_file" 
+                                       accept=".pdf"
+                                       class="hidden" 
+                                       required>
+                                <label for="pdf_file" class="cursor-pointer">
+                                    <div class="text-6xl text-primary-400 group-hover:text-primary-500 mb-4">
+                                        <i class="fas fa-cloud-upload-alt"></i>
+                                    </div>
+                                    <div class="text-lg font-medium text-gray-700">
+                                        Drop your PDF here or click to browse
+                                    </div>
+                                    <p class="text-sm text-gray-500 mt-2">
+                                        Supports mathematical equations and complex layouts
+                                    </p>
+                                </label>
+                            </div>
+
+                            <!-- Process Button -->
+                            <div class="flex justify-center">
+                                <button type="submit"
+                                        class="inline-flex items-center px-6 py-3 text-lg font-medium rounded-xl 
+                                               bg-primary-600 text-white hover:bg-primary-700 
+                                               focus:outline-none focus:ring-2 focus:ring-offset-2 
+                                               focus:ring-primary-500 transition-colors
+                                               shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+                                    <i class="fas fa-magic mr-2"></i>
+                                    Process PDF
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- Processing Status -->
+                    <div id="processing" 
+                         class="hidden mt-8 text-center processing-animation">
+                        <div class="inline-flex items-center px-4 py-2 rounded-lg bg-primary-100 text-primary-700">
+                            <i class="fas fa-spinner fa-spin mr-2"></i>
+                            <span>Processing your PDF...</span>
+                        </div>
+                    </div>
+
+                    <!-- Results Section -->
+                    <div id="result" class="mt-8"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-white border-t border-primary-100 mt-auto">
+        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            <p class="text-center text-gray-600">
+                PDFNetra - Professional PDF OCR with LaTeX Support
+                <span class="block text-sm mt-1 text-gray-500">
+                    Powered by Gemini AI
+                </span>
+            </p>
+        </div>
+    </footer>
+
+    <script>
+        // Backend API URL - replace with your actual backend URL
+        const BACKEND_URL = 'https://your-backend-url.com';
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const dropZone = document.querySelector('.drop-zone');
+            const fileInput = document.querySelector('#pdf_file');
+            const processingDiv = document.querySelector('#processing');
+            const resultDiv = document.querySelector('#result');
+
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, highlight, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, unhighlight, false);
+            });
+
+            function highlight(e) {
+                dropZone.classList.add('border-primary-500');
+                dropZone.classList.add('bg-primary-100/50');
+            }
+
+            function unhighlight(e) {
+                dropZone.classList.remove('border-primary-500');
+                dropZone.classList.remove('bg-primary-100/50');
+            }
+
+            dropZone.addEventListener('drop', handleDrop, false);
+
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                fileInput.files = files;
+            }
+
+            fileInput.addEventListener('change', function() {
+                if(this.files.length > 0) {
+                    const fileName = this.files[0].name;
+                    dropZone.querySelector('div.text-lg').textContent = `Selected: ${fileName}`;
+                }
+            });
+        });
+
+        async function handleSubmit(event) {
+            event.preventDefault();
+            
+            const fileInput = document.querySelector('#pdf_file');
+            const processingDiv = document.querySelector('#processing');
+            const resultDiv = document.querySelector('#result');
+            
+            if (!fileInput.files.length) {
+                alert('Please select a PDF file');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('pdf_file', fileInput.files[0]);
+
+            try {
+                processingDiv.classList.remove('hidden');
+                
+                const response = await fetch(`${BACKEND_URL}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Upload failed');
+                }
+
+                const data = await response.json();
+                
+                // Display results
+                resultDiv.innerHTML = `
+                    <div class="bg-white rounded-xl border border-primary-200 overflow-hidden">
+                        <div class="px-4 py-3 bg-primary-50 border-b border-primary-100">
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-lg font-semibold text-primary-900">
+                                    <i class="fas fa-check-circle text-primary-500 mr-2"></i>
+                                    Extracted Content
+                                </h3>
+                            </div>
+                        </div>
+                        <div class="p-4">
+                            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 whitespace-pre-wrap font-mono text-sm overflow-auto max-h-[600px]">
+                                ${data.text}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                alert('Error processing PDF: ' + error.message);
+            } finally {
+                processingDiv.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html> 
