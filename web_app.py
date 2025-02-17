@@ -40,19 +40,17 @@ def upload_file():
         if not api_key:
             return jsonify({'error': 'API key not configured'}), 500
 
-        process_pdf(filepath, api_key)
+        output_file = process_pdf(filepath, api_key)
 
         # Read the output file
-        output_file = f"{os.path.splitext(filepath)[0]}_ocred.md"
         with open(output_file, 'r', encoding='utf-8') as f:
             output_text = f.read()
 
-        # Store the output text in session for downloads
-        original_filename = os.path.splitext(file.filename)[0]
-
-        return render_template('index.html', 
-                             output_text=output_text,
-                             filename=original_filename)
+        # Return JSON response
+        return jsonify({
+            'text': output_text,
+            'filename': os.path.splitext(file.filename)[0]
+        })
 
     except Exception as e:
         logger.error(f"Error processing file: {str(e)}")
